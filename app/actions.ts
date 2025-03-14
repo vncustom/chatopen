@@ -17,8 +17,6 @@ export async function sendMessage(
       messages: [{ role: "user", content: message }],
     }
 
-    console.log("Sending to OpenRouter API:", JSON.stringify(payload))
-
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: headers,

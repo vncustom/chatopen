@@ -155,22 +155,22 @@ export default function ChatPage() {
     setIsProcessing(true)
 
     try {
-      // Prepare content with actual file content
+      // Prepare content with file information if needed
       let messageContent = input
+      if (attachments.length > 0) {
+        const fileInfo = attachments
+          .map((att) => {
+            if (att.type.startsWith("image/")) {
+              return `[Image attached: ${att.name}]`
+            } else if (att.content) {
+              return `[Text file attached: ${att.name}]`
+            } else {
+              return `[File attached: ${att.name}]`
+            }
+          })
+          .join("\n")
 
-      // Include text file contents directly in the message
-      const textFiles = attachments.filter((att) => att.content && !att.type.startsWith("image/"))
-      if (textFiles.length > 0) {
-        const textContents = textFiles.map((file) => `File: ${file.name}\nContent:\n${file.content}`).join("\n\n")
-
-        messageContent = messageContent.trim() ? `${messageContent}\n\n${textContents}` : textContents
-      }
-
-      // For images, just mention them (OpenRouter doesn't support image input in this way)
-      const imageFiles = attachments.filter((att) => att.type.startsWith("image/"))
-      if (imageFiles.length > 0) {
-        const imageInfo = imageFiles.map((img) => `[Image attached: ${img.name}]`).join("\n")
-        messageContent = messageContent.trim() ? `${messageContent}\n\n${imageInfo}` : imageInfo
+        messageContent = messageContent.trim() ? `${messageContent}\n\n${fileInfo}` : fileInfo
       }
 
       const response = await sendMessage(messageContent, model, apiKey)
