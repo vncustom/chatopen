@@ -10,26 +10,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Label } from "@/components/ui/label"
 import { sendMessage } from "@/app/actions"
-import { Paperclip, Loader2, X } from "lucide-react"
-import Image from "next/image"
+import { Loader2 } from "lucide-react"
 
 interface Message {
   role: "user" | "assistant" | "error"
   content: string
   timestamp: string
-  attachments?: {
-    name: string
-    type: string
-    content?: string
-    url?: string
-  }[]
-}
-
-interface FileAttachment {
-  name: string
-  type: string
-  content?: string
-  url?: string
 }
 
 export default function ChatPage() {
@@ -39,8 +25,6 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([])
   const [isProcessing, setIsProcessing] = useState<boolean>(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const [attachments, setAttachments] = useState<FileAttachment[]>([])
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const models = [
     "deepseek/deepseek-r1:free",
@@ -51,9 +35,6 @@ export default function ChatPage() {
     "google/gemini-2.0-pro-exp-02-05:free",
     "google/gemini-2.0-flash-thinking-exp:free",
     "meta-llama/llama-3.3-70b-instruct:free",
-    "qwen/qwq-32b:free",
-    "cognitivecomputations/dolphin3.0-r1-mistral-24b:free",
-    "deepseek/deepseek-r1-distill-llama-70b:free",
   ]
 
   useEffect(() => {
@@ -62,61 +43,6 @@ export default function ChatPage() {
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files
-    if (!files || files.length === 0) return
-
-    Array.from(files).forEach((file) => {
-      const reader = new FileReader()
-
-      if (file.type.startsWith("image/")) {
-        reader.onload = (e) => {
-          const result = e.target?.result as string
-          setAttachments((prev) => [
-            ...prev,
-            {
-              name: file.name,
-              type: file.type,
-              url: result,
-            },
-          ])
-        }
-        reader.readAsDataURL(file)
-      } else if (file.type === "text/plain" || file.name.endsWith(".txt")) {
-        reader.onload = (e) => {
-          const result = e.target?.result as string
-          setAttachments((prev) => [
-            ...prev,
-            {
-              name: file.name,
-              type: file.type,
-              content: result,
-            },
-          ])
-        }
-        reader.readAsText(file)
-      } else {
-        // For other file types, just store the name and type
-        setAttachments((prev) => [
-          ...prev,
-          {
-            name: file.name,
-            type: file.type,
-          },
-        ])
-      }
-    })
-
-    // Clear the file input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ""
-    }
-  }
-
-  const removeAttachment = (index: number) => {
-    setAttachments((prev) => prev.filter((_, i) => i !== index))
   }
 
   const handleSendMessage = async (e: React.FormEvent) => {
@@ -138,7 +64,7 @@ export default function ChatPage() {
       return
     }
 
-    if (!input.trim() && attachments.length === 0) {
+    if (!input.trim()) {
       return
     }
 
@@ -146,34 +72,14 @@ export default function ChatPage() {
       role: "user",
       content: input,
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      attachments: attachments.length > 0 ? [...attachments] : undefined,
     }
 
     setMessages((prev) => [...prev, userMessage])
     setInput("")
-    setAttachments([])
     setIsProcessing(true)
 
     try {
-      // Prepare content with file information if needed
-      let messageContent = input
-      if (attachments.length > 0) {
-        const fileInfo = attachments
-          .map((att) => {
-            if (att.type.startsWith("image/")) {
-              return `[Image attached: ${att.name}]`
-            } else if (att.content) {
-              return `[Text file attached: ${att.name}]`
-            } else {
-              return `[File attached: ${att.name}]`
-            }
-          })
-          .join("\n")
-
-        messageContent = messageContent.trim() ? `${messageContent}\n\n${fileInfo}` : fileInfo
-      }
-
-      const response = await sendMessage(messageContent, model, apiKey)
+      const response = await sendMessage(input, model, apiKey)
 
       if (response.error) {
         setMessages((prev) => [
@@ -269,27 +175,7 @@ export default function ChatPage() {
                               : "bg-destructive/10 text-destructive"
                         }`}
                       >
-                        <div>{message.content}</div>
-
-                        {message.attachments && message.attachments.length > 0 && (
-                          <div className="mt-2 space-y-2">
-                            {message.attachments.map((attachment, idx) => (
-                              <div key={idx} className="border rounded p-2">
-                                <div className="text-xs text-muted-foreground mb-1">{attachment.name}</div>
-                                {attachment.type.startsWith("image/") && attachment.url && (
-                                  <div className="relative h-40 w-full">
-                                    <Image
-                                      src={attachment.url || "/placeholder.svg"}
-                                      alt={attachment.name}
-                                      fill
-                                      className="object-contain"
-                                    />
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                        {message.content}
                       </div>
                     </div>
                   ))}
@@ -299,58 +185,25 @@ export default function ChatPage() {
             </CardContent>
           </Card>
 
-          <>
-            {attachments.length > 0 && (
-              <div className="flex flex-wrap gap-2 mb-2">
-                {attachments.map((file, index) => (
-                  <div key={index} className="flex items-center bg-secondary/20 rounded-lg p-2 text-sm">
-                    <span className="truncate max-w-[200px]">{file.name}</span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-5 w-5 ml-1"
-                      onClick={() => removeAttachment(index)}
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-            <form onSubmit={handleSendMessage} className="flex gap-2">
-              <div className="relative flex-1">
-                <Input
-                  placeholder="Nhập tin nhắn..."
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  disabled={isProcessing}
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isProcessing}
-                >
-                  <Paperclip className="h-4 w-4" />
-                </Button>
-                <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" multiple />
-              </div>
-              <Button type="submit" disabled={isProcessing}>
-                {isProcessing ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Đang xử lý
-                  </>
-                ) : (
-                  "Gửi"
-                )}
-              </Button>
-            </form>
-          </>
+          <form onSubmit={handleSendMessage} className="flex gap-2">
+            <Input
+              placeholder="Nhập tin nhắn..."
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              disabled={isProcessing}
+            />
+            <Button type="submit" disabled={isProcessing}>
+              {isProcessing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Đang xử lý
+                </>
+              ) : (
+                "Gửi"
+              )}
+            </Button>
+          </form>
         </CardContent>
-        <div className="text-center text-xs text-muted-foreground py-2 border-t">Author: bobchang0301@gmail.com</div>
       </Card>
     </div>
   )
